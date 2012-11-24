@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Snake game by Андрей Дорохов</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="style.css" />
+<script type="text/javascript">
+// Размер одной ячейки:
+var pointSize = 20;
+
+// Размер поля:
+var fieldSizeX = 40;
+var fieldSizeY = 25;
+
+// Переменные:
+var snake, apple, context, canvas, intervalId, timerSpeed;
+
+// Рекорд:
+var record = 0;
+
+// Флажок для остановки игры:
+var stopGame = false;
+
+window.onload = function() {
+	canvas = document.getElementById("gamefield");
+	context = canvas.getContext('2d');
+	// Размер поля:
+	canvas.width = fieldSizeX * pointSize;
+	canvas.height = fieldSizeY * pointSize;
+	
+	context.fillStyle = "#FFF";
+    context.strokeStyle = "#3F91FF";
+	context.font = "30pt Arial";
+	context.strokeText("Удивительная игра \"Змейка\"", 120, 250);
+	
+	// Старт игры:
+	document.getElementById("startgame").onclick = function() {
+	
+		// Снимаем флажок остановки:
+		stopGame = false;
+		
+		// Корректируем кнопочки:
+		this.style.display = "none";
+		document.getElementById("stopgame").style.display = 'block';
+	
+		// Рисуем поле:
+		context.fillStyle = "#000";
+		context.fillRect(0, 0, canvas.width, canvas.height);
+		
+		// Выставляем исходные значения змейки:
+		snake = {
+			currentX : 1,
+			currentY : 1,
+			direction : "right",
+			speed : 1,
+			size : 1,
+			body : [
+				{x : 1, y : 1}
+			]
+		};
+		
+		// Обнуляем счетчик:
+		document.getElementById("score").innerHTML = 0;
+		
+		// Бросаем яблоко для змейки:
+		apple = dropApple(context);
+	
+		// Выпускаем зверя:
+		snakeMotion();
+		
+		// Изменение скорости со временем:
+		timerSpeed = setInterval(function() {
+			snake.speed++; clearInterval(intervalId); snakeMotion();
+		}, 60000);
+	}
+	
+	// Остановка игры:
+	document.getElementById("stopgame").onclick = function() {
+		stopGame = true;
+		// Корректируем кнопочки:
+		this.style.display = "none";
+		document.getElementById("startgame").style.display = 'block';
+	}
+	
+	// Управление:
+	window.onkeydown = function (event) {
+		switch (event.which) {
+			case 37: if (snake.direction != "right") snake.direction = "left"; break;
+			case 38: if (snake.direction != "up") snake.direction = "down"; break;
+			case 39: if (snake.dirextion != "left") snake.direction = "right"; break;
+			case 40: if (snake.direction != "down") snake.direction = "up"; break;
+		}
+	}
+}
+
+// Цикл игры:
+function snakeMotion() {
+	var speed = 350 - snake.speed * 5;
+	intervalId = setInterval(function() {
+	
+		// Остановка игры?
+		if (stopGame) {
+			clearInterval(intervalId);
+			clearInterval(timerSpeed);
+		}
+		
+		// Смотрим направление:
+		switch (snake.direction) {
+			case "left" : snake.currentX--; break;
+			case "right" : snake.currentX++; break;
+			case "up" : snake.currentY++; break;
+			case "down" : snake.currentY--; break;
+		}
+		
+		// Проверяем, не врезалась ли змейка в себя:
+		var isCrash = checkPoint({
+			x: snake.currentX,
+			y: snake.currentY
+		}, snake.body);
+		
+		// Если врезалась, то конец игры:
+		if (isCrash) {
+			clearInterval(intervalId);
+			clearInterval(timerSpeed);
+			// Проверяем, не рекорд ли:
+			if (--snake.size > record) {record = snake.size; document.getElementById("record").innerHTML = record;}
+
+			// Рисуем набранные очки:
+			context.fillStyle = "#000";
+			context.fillRect(0, 0, canvas.width, canvas.height);
+			context.fillStyle = "#FFF";
+			context.strokeStyle = "#3F91FF";
+			context.font = "30pt Arial";
+			context.strokeText("Игра окончена! Ваш счёт: " + snake.size + "!", 120, 250);
+			
+			// Возвращаем кнопочку запуска:
+			document.getElementById("stopgame").style.display = 'none';
+			document.getElementById("startgame").style.display = 'block';
+
+			return false;
+		}
+		
+		// Рисуем новое положение:
+		if (snake.currentX > fieldSizeX - 1) snake.currentX = 0;
+		if (snake.currentX < 0) snake.currentX = fieldSizeX - 1;
+		
+		if (snake.currentY > fieldSizeY - 1) snake.currentY = 0;
+		if (snake.currentY < 0) snake.currentY = fieldSizeY - 1;
+		
+		putPoint(context, snake.currentX, snake.currentY, "#FFF");
+		snake.body.push({x: snake.currentX, y: snake.currentY});
+		
+		// Убираем хвост:
+		if (snake.body.length > snake.size) {
+			var pointToDelete = snake.body.shift();
+			putPoint(context, pointToDelete.x, pointToDelete.y, "#000");
+		}
+		
+		// Проглотил яблоко?
+		if (snake.currentX == apple.x && snake.currentY == apple.y) {
+			// Увеличиваем длину змейки:
+			snake.size++;
+			// Отображаем на страничке:
+			document.getElementById("score").innerHTML = snake.size - 1;
+			// Увеличиваем скорость змейки:
+			snake.speed++; clearInterval(intervalId); snakeMotion();
+			// Бросаем ещё одно яблоко:
+			apple = dropApple(context);
+		}
+	}, speed);
+	
+}
+
+// Функция отрисовки блоков:
+function putPoint(context, x, y, color) {
+	context.fillStyle = color;
+	context.fillRect(x * window.pointSize, y * window.pointSize, window.pointSize, window.pointSize);
+}
+
+// Бросаем еду:
+function dropApple(context) {
+	// Смотрим, чтобы яблоко не попало на змейку:
+	var isBusyPlace = true;
+	while (isBusyPlace) {
+		var x = Math.floor(Math.random() * (window.fieldSizeX));
+		var y = Math.floor(Math.random() * (window.fieldSizeY));
+		if (!checkPoint({x: x, y: y}, snake.body)) isBusyPlace = false; 
+	}
+	putPoint(context, x, y, "#0F0");
+	// Возвращаем координаты яблока:
+	return {x: x, y: y};
+}
+
+// Проверка срабатывает, если текущая клеточка принадлежит телу змейки: 
+function checkPoint(currentPosition, snakeBody) {
+	for (i = 0; i < snakeBody.length; i++) {
+		if (snakeBody[i].x == currentPosition.x && snakeBody[i].y == currentPosition.y) {
+			return true;
+		}
+	}
+	return false;
+}
+
+</script>
+</head>
+<body>
+<header>
+	<div class="buttons">
+		<a id="startgame" class="style-button" href="#">Начать игру</a>
+		<a id="stopgame" class="style-button" href="#">Остановить игру</a>
+	</div>
+	<div id="score-block">
+		<div class="score">
+			Набрано очков: <span id="score">0</span>
+		</div>
+		<div class="record">
+			Рекорд: <span id="record">0</span>
+		</div>
+	</div>
+</header>
+<canvas id="gamefield"></canvas>
+</body>
+</html>
